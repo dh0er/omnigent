@@ -235,6 +235,10 @@ def test_cursor_model_catalog_keeps_effort_variants() -> None:
     catalog = cursor_native.cursor_model_catalog(_CURSOR_MODELS_OUTPUT)
     by_id = {str(row["id"]): row for row in catalog}
 
+    assert [str(row["displayName"]) for row in catalog] == sorted(
+        (str(row["displayName"]) for row in catalog),
+        key=str.casefold,
+    )
     assert by_id["auto"].get("supportedReasoningEfforts") is None
     assert by_id["composer-2.5"].get("supportedReasoningEfforts") is None
     assert by_id["gpt-5.3-codex"]["supportedReasoningEfforts"] == [
