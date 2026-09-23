@@ -636,6 +636,10 @@ def pi_native_model_options(
     for provider_id, payload in rendered["providers"].items():
         for model in payload["models"]:
             model_id = model["id"]
+            # The live listing also returns embedding models. Those are not
+            # chat targets, so they must not appear in the picker.
+            if "bge" in model_id.lower() or "embed" in model_id.lower():
+                continue
             qualified = f"{provider_id}/{model_id}"
             options[qualified] = {
                 "id": qualified,

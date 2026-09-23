@@ -3422,6 +3422,13 @@ function NewChatLandingContent({
     canLoadHostModels("pi-native"),
     { poll: selectedNativeHarness === "pi-native" },
   );
+  const {
+    data: hostCursorModelOptions,
+    isLoading: hostCursorModelsLoading,
+    error: hostCursorModelsError,
+  } = useHostModelOptions(selectedHostId, "cursor-native", canLoadHostModels("cursor-native"), {
+    poll: selectedNativeHarness === "cursor-native",
+  });
   // Keep this host's cached choices while requests wait for readiness.
   // A fetched catalog, including an empty one, takes precedence.
   const cachedHostModels =
@@ -3465,6 +3472,12 @@ function NewChatLandingContent({
     hostPiModelOptions,
     hostPiModelsLoading,
     cachedHostModels?.pi,
+  );
+  const availableCursorModels = availableHostModels(
+    "cursor-native",
+    hostCursorModelOptions,
+    hostCursorModelsLoading,
+    cachedHostModels?.cursor,
   );
   const {
     data: hostDevinModelOptions,
@@ -3637,6 +3650,10 @@ function NewChatLandingContent({
           })),
     [availablePiModels, sandboxSelected, sandboxCatalog],
   );
+  const cursorModelOptions = useMemo(
+    () => (sandboxSelected ? (sandboxCatalog ?? []) : (availableCursorModels ?? [])),
+    [availableCursorModels, sandboxSelected, sandboxCatalog],
+  );
   const supportsPermissionMode = nativeAgentHasCapability(selectedAgent, "permissionMode");
   const supportsDevinMode = nativeAgentHasCapability(selectedAgent, "devinMode");
   const supportsApprovalMode = nativeAgentHasCapability(selectedAgent, "approvalMode");
@@ -3688,6 +3705,8 @@ function NewChatLandingContent({
   const isEntryConfigurable = (agent: AvailableAgent) =>
     (sandboxHasModelCatalog && agent.id === effectiveAgentId) ||
     nativeAgentHasModelSettings(agent) ||
+    // cursorMode is plan/ask only; the model catalog still comes from the host.
+    nativeAgentHasCapability(agent, "cursorMode") ||
     agentHasAdvancedSettings(agent, brainHarnessLabelsAll);
   // Only an eligible harness can display active per-turn Smart Routing.
   const routingOn = smartRoutingEligible && costControlMode === "on";
@@ -3808,7 +3827,23 @@ function NewChatLandingContent({
     if (supportsCursorMode) {
       const modeValue =
         CURSOR_NATIVE_EXEC_MODES.find((m) => m.value === cursorExecMode)?.label ?? cursorExecMode;
-      return [{ label: "Mode", value: modeValue }, ...routingRow];
+      const pickedCursorRow = cursorModelOptions.find((model) => model.id === pickedModel);
+      const modelValue = visibleModelLabel(
+        routingOn
+          ? SMART_ROUTING_LABEL
+          : pickedCursorRow
+            ? nativeModelLabel(pickedCursorRow)
+            : defaultModelLabel(cursorModelOptions),
+      );
+      const effortValue = routingOn
+        ? EFFORT_UNAVAILABLE_PLACEHOLDER
+        : normalizeEffortLabel(pickedEffort);
+      return [
+        { label: "Model", value: modelValue },
+        ...(effortValue ? [{ label: "Effort", value: effortValue }] : []),
+        { label: "Mode", value: modeValue },
+        ...sourceRows(cursorModelOptions),
+      ];
     }
     if (supportsAgySkipPermissions) {
       const skipValue =
@@ -3845,6 +3880,7 @@ function NewChatLandingContent({
     claudeModelOptions,
     codexModelOptions,
     piModelOptions,
+    cursorModelOptions,
     pickedEffort,
     permissionMode,
     approvalMode,
@@ -3874,7 +3910,9 @@ function NewChatLandingContent({
           ? piModelOptions
           : selectedNativeHarness === "codex-native"
             ? codexModelOptions
-            : [];
+            : selectedNativeHarness === "cursor-native"
+              ? cursorModelOptions
+              : [];
   const pickerModelsLoading =
     sandboxCatalogPending ||
     (!sandboxSelected &&
@@ -3887,7 +3925,9 @@ function NewChatLandingContent({
             ? hostPiModelsLoading
             : selectedNativeHarness === "devin-native"
               ? hostDevinModelsLoading
-              : false));
+              : selectedNativeHarness === "cursor-native"
+                ? hostCursorModelsLoading
+                : false));
   const pickerModelsError = sandboxSelected
     ? sandboxCatalogError || sandboxDefaultCatalogError
       ? new Error((sandboxCatalogError ?? sandboxDefaultCatalogError)!)
@@ -3898,7 +3938,9 @@ function NewChatLandingContent({
         ? hostCodexModelsError
         : selectedNativeHarness === "devin-native"
           ? hostDevinModelsError
-          : null;
+          : selectedNativeHarness === "cursor-native"
+            ? hostCursorModelsError
+            : null;
   const modelCatalogLookupEnabled = sandboxSelected
     ? sandboxPreviewEnabled && sandboxInferenceConfigured
     : selectedNativeHarness !== null && canLoadHostModels(selectedNativeHarness);
@@ -3972,6 +4014,7 @@ function NewChatLandingContent({
               claude: availableClaudeModels,
               codex: availableCodexModels,
               pi: availablePiModels,
+              cursor: availableCursorModels,
             },
           }
         : null,
@@ -3984,6 +4027,7 @@ function NewChatLandingContent({
       availableClaudeModels,
       availableCodexModels,
       availablePiModels,
+      availableCursorModels,
     ],
   );
   useEffect(() => {
@@ -4023,7 +4067,13 @@ function NewChatLandingContent({
         value,
         label: normalizeEffortLabel(value),
       }))
-    : (nativeEffortOptions(selectedNativeHarness, pickerModelOptions, pickedModel) ?? []);
+    : selectedNativeHarness === "cursor-native"
+      ? // Cursor takes effort as a model-id suffix, so the ladder follows the catalog row.
+        codexEffortLevelsForModel(
+          cursorModelOptions,
+          pickedModel || cursorModelOptions.find((option) => option.isDefault)?.id,
+        ).map((value) => ({ value, label: normalizeEffortLabel(value) }))
+      : (nativeEffortOptions(selectedNativeHarness, pickerModelOptions, pickedModel) ?? []);
   const rememberPickerOptions = (harness: string, options: HarnessOptions) => {
     const picked = pickedOptionKeysRef.current.get(harness) ?? new Set<string>();
     for (const key of Object.keys(options)) picked.add(key);
@@ -4072,15 +4122,21 @@ function NewChatLandingContent({
     }
     const picked = model === MODEL_SELECT_DEFAULT ? "" : model;
     // Gateway catalogs carry no default row, so Default keeps no effort.
+    const effortCatalog =
+      selectedNativeHarness === "codex-native"
+        ? codexModelOptions
+        : selectedNativeHarness === "cursor-native"
+          ? cursorModelOptions
+          : null;
     const effortModel = sandboxDefaultModelsEnabled
       ? picked
-      : picked || codexModelOptions.find((option) => option.isDefault)?.id;
+      : picked || effortCatalog?.find((option) => option.isDefault)?.id;
     const effort =
-      (sandboxDefaultModelsEnabled || selectedNativeHarness === "codex-native") &&
+      (sandboxDefaultModelsEnabled || effortCatalog !== null) &&
       !(
         sandboxDefaultModelsEnabled
           ? sandboxEffortLevels(pickerModelOptions, effortModel)
-          : codexEffortLevelsForModel(codexModelOptions, effortModel)
+          : codexEffortLevelsForModel(effortCatalog ?? [], effortModel)
       ).includes(pickedEffort)
         ? ""
         : pickedEffort;
@@ -4150,6 +4206,7 @@ function NewChatLandingContent({
     supportsModelPicker ||
     supportsPermissionMode ||
     supportsDevinMode ||
+    supportsCursorMode ||
     selectedNativeHarness === "codex-native"
       ? {
           testId: "new-chat-landing-agent-models",
@@ -4331,6 +4388,7 @@ function NewChatLandingContent({
     "claude-native": availableClaudeModels,
     "codex-native": availableCodexModels,
     "pi-native": availablePiModels,
+    "cursor-native": availableCursorModels,
     "devin-native": hostDevinModelOptions,
   };
   const pickerEntrySummaries = Object.fromEntries(
@@ -4353,7 +4411,9 @@ function NewChatLandingContent({
               ? piModelOptions
               : native.iconKind === "devin"
                 ? devinModelOptions
-                : [];
+                : native.iconKind === "cursor"
+                  ? cursorModelOptions
+                  : [];
       const savedFusion = fusionOption(catalog)?.fusion;
       // Preserve saved IDs while host data is absent; an empty result is authoritative.
       const hostCatalogUnavailable =
@@ -4373,7 +4433,7 @@ function NewChatLandingContent({
       );
       const efforts = native.iconKind === "pi" ? PI_NATIVE_EFFORTS : CLAUDE_NATIVE_EFFORTS;
       const effort =
-        native.iconKind === "codex"
+        native.iconKind === "codex" || native.iconKind === "cursor"
           ? normalizeEffortLabel(saved.effort ?? "")
           : efforts.find((option) => option.value === saved.effort)?.label;
       return [agent.id, [compactModelTriggerLabel(label), effort].filter(Boolean).join(" ")];
@@ -4460,7 +4520,9 @@ function NewChatLandingContent({
           ? devinModelOptions
           : selectedNativeHarness === "codex-native"
             ? codexModelOptions
-            : [];
+            : selectedNativeHarness === "cursor-native"
+              ? cursorModelOptions
+              : [];
   const projectDefaultModelValid =
     projectDefaultModel != null && projectModelVocab.some((m) => m.id === projectDefaultModel)
       ? projectDefaultModel
@@ -6048,6 +6110,7 @@ function NewChatLandingContent({
         // and Devin launches on its own config default.
         (sandboxHasModelCatalog ||
           agentSupportsModelPicker ||
+          agentSupportsCursorMode ||
           nativeAgent?.harness === "codex-native" ||
           nativeAgent?.harness === "devin-native") &&
         submittedModel
@@ -6058,6 +6121,7 @@ function NewChatLandingContent({
         !routingOwnsModel &&
         (sandboxDefaultModelsEnabled ||
           agentSupportsPermissionMode ||
+          agentSupportsCursorMode ||
           selectedNativeHarness === "pi-native" ||
           nativeAgent?.harness === "codex-native" ||
           nativeAgent?.harness === "devin-native") &&
