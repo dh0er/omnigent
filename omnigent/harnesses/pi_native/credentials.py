@@ -137,14 +137,61 @@ _is_databricks_ai_gateway_url = is_databricks_ai_gateway_url
 _PiModelEntry: TypeAlias = PiModelEntry
 
 
+def _named_pi_sibling_id(name: str) -> str:
+    """Provider id for a non-default Pi endpoint in the managed ``models.json``."""
+    return f"omnigent-{name}"
+
+
+def _is_named_pi_sibling(provider_id: str) -> bool:
+    """True for an extra configured endpoint, not a Databricks surface id."""
+    return (
+        provider_id.startswith("omnigent-") and provider_id not in _SURFACE_PROVIDER_IDS.values()
+    )
+
+
 def _split_pi_native_model_selection(selection: str | None) -> tuple[str, str] | None:
     """Split an Omnigent-managed ``provider/model`` picker value."""
     if not selection:
         return None
     provider_id, separator, model_id = selection.partition("/")
-    if separator and provider_id in _PI_MANAGED_PROVIDER_IDS and model_id:
+    if separator and model_id and (
+        provider_id in _PI_MANAGED_PROVIDER_IDS or _is_named_pi_sibling(provider_id)
+    ):
         return provider_id, model_id
     return None
+
+
+def _with_named_pi_siblings(
+    resolved: PiProviderConfig,
+    config: dict[str, object],
+    *,
+    primary_name: str,
+) -> PiProviderConfig:
+    """Register every other key/gateway/local provider alongside the Pi default.
+
+    The Pi surface has one default (the model the picker opens on). Other
+    endpoints configured next to it — a second gateway, for example — stay
+    selectable as ``omnigent-<name>/<model>`` without becoming that default.
+    """
+    from omnigent.onboarding.provider_config import load_providers
+
+    additional = dict(resolved.additional_providers)
+    for name, sibling_entry in load_providers(config).items():
+        if name == primary_name or sibling_entry.kind not in (KEY_KIND, GATEWAY_KIND, LOCAL_KIND):
+            continue
+        provider_id = _named_pi_sibling_id(name)
+        if provider_id in additional or provider_id in _SURFACE_PROVIDER_IDS.values():
+            continue
+        sibling = _inline_family_pi_provider(sibling_entry, model=None, preserve_model_ids=True)
+        if sibling is None:
+            continue
+        payload = sibling.to_models_config()["providers"].get(_PI_PROVIDER_ID)
+        if not isinstance(payload, dict):
+            continue
+        additional[provider_id] = payload
+    if additional == resolved.additional_providers:
+        return resolved
+    return replace(resolved, additional_providers=additional)
 
 
 class _PiProviderCompat(TypedDict, total=False):
@@ -1575,7 +1622,12 @@ def resolve_pi_native_provider(
 
     selection = _split_pi_native_model_selection(model)
     unmanaged_prefix_warning: str | None = None
-    if selection is not None:
+    if selection is not None and _is_named_pi_sibling(selection[0]):
+        # A sibling endpoint (``omnigent-synapse/gpt-6-sol``) must not retarget
+        # the primary provider's model. Launch selects it from the rendered
+        # catalog; the primary keeps its own default.
+        model = None
+    elif selection is not None:
         _, model = selection
     try:
         # Pi is multi-family; ``omnigent setup`` marks defaults per family, not
@@ -1671,6 +1723,8 @@ def resolve_pi_native_provider(
                 resolved = _databricks_pi_provider(db_entry, model=model)
             if resolved is None:
                 _LOGGER.warning("pi-native: no usable provider found; Pi will use its own login.")
+        if resolved is not None:
+            resolved = _with_named_pi_siblings(resolved, config, primary_name=entry.name)
         if resolved is not None and unmanaged_prefix_warning is not None:
             resolved = replace(
                 resolved,
