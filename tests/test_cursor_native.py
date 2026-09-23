@@ -230,6 +230,33 @@ def test_parse_cursor_cli_model_options_logs_unmapped_claude_ids(
     assert "Skipping non-injectable Cursor model id 'claude-4-sonnet'" in caplog.text
 
 
+def test_cursor_model_catalog_keeps_effort_variants() -> None:
+    """Effort stays a suffix the launcher can reattach; the picker keeps the base id."""
+    catalog = cursor_native.cursor_model_catalog(_CURSOR_MODELS_OUTPUT)
+    by_id = {str(row["id"]): row for row in catalog}
+
+    assert by_id["auto"].get("supportedReasoningEfforts") is None
+    assert by_id["composer-2.5"].get("supportedReasoningEfforts") is None
+    assert by_id["gpt-5.3-codex"]["supportedReasoningEfforts"] == [
+        {"reasoningEffort": "low"},
+        {"reasoningEffort": "high"},
+    ]
+    assert by_id["gpt-5.3-codex"]["effortModels"] == {
+        "low": "gpt-5.3-codex-low",
+        "high": "gpt-5.3-codex-high-fast",
+    }
+    assert by_id["claude-opus-4-6"]["effortModels"] == {"high": "claude-4.6-opus-high"}
+    assert cursor_native.cursor_variant_id("gpt-5.3-codex", "high", catalog) == (
+        "gpt-5.3-codex-high-fast"
+    )
+    assert cursor_native.cursor_variant_id("auto", "high", catalog) == "auto"
+    assert cursor_native.cursor_variant_id("gpt-5.3-codex", None, catalog) == "gpt-5.3-codex"
+    both = cursor_native.cursor_model_catalog(
+        "gpt-5.3-codex-high-fast - Codex 5.3 High Fast\ngpt-5.3-codex-high - Codex 5.3 High\n"
+    )
+    assert cursor_native.cursor_variant_id("gpt-5.3-codex", "high", both) == "gpt-5.3-codex-high"
+
+
 def test_parse_cursor_cli_model_options_rejects_empty_catalog() -> None:
     """Malformed CLI output is retryable rather than cached as an empty picker."""
     with pytest.raises(ValueError, match="did not contain any valid models"):

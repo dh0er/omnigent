@@ -8529,7 +8529,7 @@ describe("NewChatLandingScreen smart routing", () => {
     ]);
     renderLanding({ smart_routing_enabled: true });
     openPermissions();
-    expect(screen.queryByTestId("new-chat-landing-agent-models")).toBeNull();
+    expect(screen.getByTestId("new-chat-landing-agent-models")).toBeVisible();
     expect(screen.getByRole("menuitemradio", { name: "Plan" })).toBeVisible();
     expect(screen.queryByRole("menuitem", { name: "Smart Routing" })).toBeNull();
   });

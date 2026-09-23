@@ -302,6 +302,133 @@ def list_cursor_cli_model_options(
     timeout_s: float = 10.0,
 ) -> list[CursorModelOption]:
     """Discover base-model picker options from the installed Cursor CLI."""
+    return parse_cursor_cli_model_options(_cursor_models_stdout(env=env, timeout_s=timeout_s))
+
+
+_CURSOR_EFFORT_NAMES = ("low", "medium", "high", "xhigh", "max")
+
+
+def _cursor_effort_name(raw_id: str, base_id: str) -> str | None:
+    """Return the effort encoded in a Cursor variant id, if any.
+
+    Cursor has no ``--effort`` flag. Effort is a suffix on the model id
+    (``gpt-5.3-codex-high``). ``-fast`` and ``-thinking`` are a separate axis.
+    """
+    if not raw_id.startswith(base_id + "-"):
+        return None
+    parts = set(raw_id[len(base_id) + 1 :].split("-"))
+    if "xhigh" in parts or ("extra" in parts and "high" in parts):
+        return "xhigh"
+    for name in ("max", "high", "medium", "low"):
+        if name in parts:
+            return name
+    return None
+
+
+def _cursor_effort_extra(raw_id: str, base_id: str) -> int:
+    """How many non-effort suffix tokens a variant id carries."""
+    if not raw_id.startswith(base_id + "-"):
+        return 0
+    parts = set(raw_id[len(base_id) + 1 :].split("-"))
+    parts -= {"xhigh", "extra", "max", "high", "medium", "low"}
+    return len(parts)
+
+
+def cursor_model_catalog(output: str) -> list[dict[str, object]]:
+    """Base-id catalog plus the effort variants the CLI actually lists.
+
+    ``parse_cursor_cli_model_options`` stays the injectable base catalog.
+    This adds ``supportedReasoningEfforts`` and ``effortModels`` so the picker
+    can offer effort and the launcher can map it back to a variant id.
+    """
+    options: list[dict[str, object]] = [
+        dict(option) for option in parse_cursor_cli_model_options(output)
+    ]
+    efforts: dict[str, dict[str, str]] = {}
+    for raw_line in output.splitlines():
+        match = _CURSOR_MODEL_LINE_RE.fullmatch(raw_line.strip())
+        if match is None:
+            continue
+        raw_id = match.group("id").strip()
+        # Effort is a suffix of the CLI id. Claude ids are rewritten to a
+        # different picker id, so detect the suffix before that rewrite and
+        # store the variant under the id the picker actually shows.
+        suffix_base = _CURSOR_VARIANT_SUFFIX_RE.sub("", raw_id)
+        effort = _cursor_effort_name(raw_id, suffix_base)
+        if effort is None:
+            continue
+        base_id = _cursor_base_model_id(raw_id)
+        current = efforts.setdefault(base_id, {}).get(effort)
+        # ``-fast`` / ``-thinking`` are a separate axis. Prefer the plain
+        # ``<base>-<effort>`` id when the CLI lists both.
+        if current is None or _cursor_effort_extra(raw_id, suffix_base) < _cursor_effort_extra(
+            current, suffix_base
+        ):
+            efforts[base_id][effort] = raw_id
+    for option in options:
+        mapping = efforts.get(str(option["id"]))
+        if not mapping:
+            continue
+        ordered = [name for name in _CURSOR_EFFORT_NAMES if name in mapping]
+        option["supportedReasoningEfforts"] = [{"reasoningEffort": name} for name in ordered]
+        option["effortModels"] = {name: mapping[name] for name in ordered}
+    return options
+
+
+def cursor_variant_id(
+    model: str, effort: str | None, catalog: Sequence[Mapping[str, object]]
+) -> str:
+    """Map a base model id plus effort onto the variant id Cursor accepts."""
+    if not effort:
+        return model
+    base_id = _cursor_base_model_id(model)
+    for option in catalog:
+        if option.get("id") not in {model, base_id}:
+            continue
+        variants = option.get("effortModels")
+        if isinstance(variants, Mapping):
+            variant = variants.get(effort)
+            if isinstance(variant, str) and variant:
+                return variant
+    return model
+
+
+def cursor_model_id_for_effort(
+    model: str,
+    effort: str | None,
+    *,
+    env: Mapping[str, str] | None = None,
+    timeout_s: float = 10.0,
+) -> str:
+    """Resolve ``model`` + effort to a ``cursor-agent --model`` id.
+
+    A catalog lookup that fails leaves the id unchanged: launching with the
+    user's pick is better than dropping ``--model``.
+    """
+    if not effort:
+        return model
+    try:
+        catalog = cursor_model_catalog(_cursor_models_stdout(env=env, timeout_s=timeout_s))
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return model
+    return cursor_variant_id(model, effort, catalog)
+
+
+def list_cursor_model_catalog(
+    *,
+    env: Mapping[str, str] | None = None,
+    timeout_s: float = 10.0,
+) -> list[dict[str, object]]:
+    """Run ``cursor-agent models`` and return the catalog with effort variants."""
+    return cursor_model_catalog(_cursor_models_stdout(env=env, timeout_s=timeout_s))
+
+
+def _cursor_models_stdout(
+    *,
+    env: Mapping[str, str] | None = None,
+    timeout_s: float = 10.0,
+) -> str:
+    """Run ``cursor-agent models`` and return stdout."""
     executable = resolve_cursor_executable(env=env)
     completed = subprocess.run(
         [executable, "models"],
@@ -311,7 +438,7 @@ def list_cursor_cli_model_options(
         timeout=timeout_s,
         env=dict(env) if env is not None else None,
     )
-    return parse_cursor_cli_model_options(completed.stdout)
+    return completed.stdout
 
 
 def run_cursor_native(

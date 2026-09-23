@@ -579,11 +579,13 @@ def test_pi_native_model_options_lists_only_managed_models(
             "id": "omnigent-openai/gpt-5.6-sol",
             "model": "omnigent-openai/gpt-5.6-sol",
             "displayName": "GPT 5.6 Sol",
+            "isDefault": False,
         },
         {
             "id": "omnigent/claude-sonnet-4-6",
             "model": "omnigent/claude-sonnet-4-6",
             "displayName": "claude-sonnet-4-6",
+            "isDefault": True,
         },
     ]
 

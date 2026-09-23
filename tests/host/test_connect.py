@@ -558,14 +558,46 @@ async def test_handle_model_options_rejects_unsupported_harness() -> None:
     host = _make_host_process()
 
     result = await host._handle_model_options(
-        HostModelOptionsFrame(request_id="req_models", harness="cursor-native"),
+        HostModelOptionsFrame(request_id="req_models", harness="goose-native"),
     )
 
     assert result == HostModelOptionsResultFrame(
         request_id="req_models",
         status="failed",
-        error="model options are unsupported for harness 'cursor-native'",
+        error="model options are unsupported for harness 'goose-native'",
     )
+
+
+async def test_handle_model_options_uses_cursor_cli_catalog(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cursor's picker is the CLI catalog, including per-model effort variants."""
+    from omnigent.harnesses.cursor_native import main as cursor_native
+
+    monkeypatch.setattr(
+        cursor_native,
+        "list_cursor_model_catalog",
+        lambda: [
+            {
+                "id": "gpt-5.3-codex",
+                "displayName": "Codex 5.3",
+                "isDefault": False,
+                "isCurrent": False,
+                "supportedReasoningEfforts": [{"reasoningEffort": "high"}],
+                "effortModels": {"high": "gpt-5.3-codex-high"},
+            }
+        ],
+    )
+    host = _make_host_process()
+
+    result = await host._handle_model_options(
+        HostModelOptionsFrame(request_id="req_cursor_models", harness="cursor-native"),
+    )
+
+    assert result.status == "ok"
+    assert result.models[0]["id"] == "gpt-5.3-codex"
+    assert result.models[0]["effortModels"] == {"high": "gpt-5.3-codex-high"}
+    _cleanup_host(host)
 
 
 async def test_handle_model_options_reports_the_endpoints_wider_catalog(
