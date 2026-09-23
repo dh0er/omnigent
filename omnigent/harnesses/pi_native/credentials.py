@@ -147,6 +147,28 @@ _is_databricks_ai_gateway_url = is_databricks_ai_gateway_url
 _PiModelEntry: TypeAlias = PiModelEntry
 
 
+def _picker_model_label(
+    provider_id: str,
+    model_id: str,
+    model: dict[str, object],
+    *,
+    source_name: str,
+    has_siblings: bool,
+) -> str:
+    """Label a picker row with its endpoint when more than one is configured.
+
+    ``synapse/gpt-6-sol`` stays distinct from ``omlx/flash:low``. A single
+    endpoint keeps the plain model name.
+    """
+    advertised = model.get("name")
+    bare = advertised if isinstance(advertised, str) and advertised else model_id
+    if _is_named_pi_sibling(provider_id):
+        return f"{provider_id.removeprefix('omnigent-')}/{model_id}"
+    if has_siblings and provider_id == _PI_PROVIDER_ID and source_name:
+        return f"{source_name}/{model_id}"
+    return bare
+
+
 def _named_pi_sibling_id(name: str) -> str:
     """Provider id for a non-default Pi endpoint in the managed ``models.json``."""
     return f"omnigent-{name}"
@@ -335,6 +357,9 @@ class PiProviderConfig:
     inference_bound: bool = False
     auth_refresh_interval_ms: int = 0
     auth_timeout_ms: int = 20_000
+    # Config name of the default Pi endpoint (``omlx``), used only to label
+    # the picker. Empty when the catalog was built without a config entry.
+    source_name: str = ""
 
     @property
     def _primary_claude_only(self) -> bool:
@@ -681,6 +706,7 @@ def pi_native_model_options(
 
     rendered = provider.to_models_config()
     default_option = f"{_default_model_provider_id(provider, rendered)}/{provider.model}"
+    has_siblings = any(_is_named_pi_sibling(provider_id) for provider_id in rendered["providers"])
     options: dict[str, dict[str, object]] = {}
     for provider_id, payload in rendered["providers"].items():
         for model in payload["models"]:
@@ -693,7 +719,13 @@ def pi_native_model_options(
             options[qualified] = {
                 "id": qualified,
                 "model": qualified,
-                "displayName": model.get("name") or model_id,
+                "displayName": _picker_model_label(
+                    provider_id,
+                    model_id,
+                    model,
+                    source_name=provider.source_name,
+                    has_siblings=has_siblings,
+                ),
                 "isDefault": qualified == default_option,
             }
     return [options[model_id] for model_id in sorted(options)]
@@ -1941,7 +1973,10 @@ def resolve_pi_native_provider(
             if resolved is None:
                 _LOGGER.warning("pi-native: no usable provider found; Pi will use its own login.")
         if resolved is not None:
-            resolved = _with_named_pi_siblings(resolved, config, primary_name=entry.name)
+            resolved = replace(
+                _with_named_pi_siblings(resolved, config, primary_name=entry.name),
+                source_name=entry.name,
+            )
         if resolved is not None and unmanaged_prefix_notice is not None:
             resolved = replace(resolved, model_notice=unmanaged_prefix_notice)
         return resolved
