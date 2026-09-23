@@ -361,6 +361,17 @@ const DEVIN_MODEL_OPTIONS_RESULT = {
     },
   ],
 };
+const CURSOR_MODEL_OPTIONS_RESULT = {
+  ...SUCCESS_QUERY_STATE,
+  data: [
+    { id: "auto", displayName: "Auto", isDefault: true },
+    {
+      id: "gpt-5.3-codex",
+      displayName: "Codex 5.3",
+      supportedReasoningEfforts: [{ reasoningEffort: "low" }, { reasoningEffort: "high" }],
+    },
+  ],
+};
 const CODEX_MODEL_OPTIONS_RESULT = {
   ...SUCCESS_QUERY_STATE,
   data: [
@@ -1243,7 +1254,9 @@ function setupLandingMocks() {
       ? CODEX_MODEL_OPTIONS_RESULT
       : harness === "devin-native"
         ? DEVIN_MODEL_OPTIONS_RESULT
-        : CLAUDE_MODEL_OPTIONS_RESULT,
+        : harness === "cursor-native"
+          ? CURSOR_MODEL_OPTIONS_RESULT
+          : CLAUDE_MODEL_OPTIONS_RESULT,
   );
   mockAgents(DEFAULT_LANDING_AGENTS);
 }
@@ -8515,6 +8528,31 @@ describe("NewChatLandingScreen smart routing", () => {
       expect(screen.getByRole("menuitemcheckbox", { name: siblingOption })).toBeTruthy();
     },
   );
+
+  it("remembers the Cursor model when switching away and back", () => {
+    mockAgents([
+      ...DEFAULT_LANDING_AGENTS,
+      {
+        id: "a_cursor",
+        name: "cursor-native-ui",
+        display_name: "Cursor",
+        description: null,
+        harness: "cursor-native",
+        skills: [],
+      },
+    ]);
+    renderLanding();
+    openAgentModels("a_cursor");
+    pickPrimaryOption("model", "Codex 5.3");
+    closePrimaryPicker();
+    expect(screen.getByTestId("new-chat-landing-agent-model-value")).toHaveTextContent("Codex 5.3");
+
+    selectAgent("a2");
+    expect(screen.getByTestId("new-chat-landing-agent-model-value")).toHaveTextContent("GPT-5.5");
+
+    selectUnconfiguredAgent("a_cursor");
+    expect(screen.getByTestId("new-chat-landing-agent-model-value")).toHaveTextContent("Codex 5.3");
+  });
 
   it("keeps non-routable Cursor modes in the hand menu", () => {
     mockAgents([

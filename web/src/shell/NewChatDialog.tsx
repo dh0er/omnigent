@@ -4185,6 +4185,24 @@ export function NewChatLandingScreen() {
       );
     } else if (supportsCursorMode) {
       setCursorExecMode(resolve(CURSOR_NATIVE_EXEC_MODES, CURSOR_NATIVE_DEFAULT_EXEC_MODE));
+      // Same per-harness snapshot as Codex: switching away and back must
+      // restore the model, not the catalog default. An id the current catalog
+      // no longer lists resolves to "" so the chip shows that default.
+      const seededCursorModel =
+        projectSeed(cursorModelOptions) ??
+        (stored.model != null && cursorModelOptions.some((model) => model.id === stored.model)
+          ? stored.model
+          : "");
+      setPickedModel(seededCursorModel);
+      setPickedEffort(
+        stored.effort != null &&
+          codexEffortLevelsForModel(
+            cursorModelOptions,
+            seededCursorModel || (cursorModelOptions.find((model) => model.isDefault)?.id ?? null),
+          ).includes(stored.effort)
+          ? stored.effort
+          : "",
+      );
     } else if (supportsAgySkipPermissions) {
       setAgySkipMode(resolve(AGY_NATIVE_SKIP_MODES, AGY_NATIVE_DEFAULT_SKIP_MODE));
     } else if (supportsDevinPermission) {
@@ -4203,6 +4221,7 @@ export function NewChatLandingScreen() {
     claudeModelOptions,
     codexModelOptions,
     piModelOptions,
+    cursorModelOptions,
     projectDefaultModel,
   ]);
   useEffect(() => {
