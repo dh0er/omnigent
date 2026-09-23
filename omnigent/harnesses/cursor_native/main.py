@@ -372,6 +372,12 @@ def cursor_model_catalog(output: str) -> list[dict[str, object]]:
         ordered = [name for name in _CURSOR_EFFORT_NAMES if name in mapping]
         option["supportedReasoningEfforts"] = [{"reasoningEffort": name} for name in ordered]
         option["effortModels"] = {name: mapping[name] for name in ordered}
+    options.sort(
+        key=lambda option: (
+            str(option.get("displayName") or option.get("id") or "").casefold(),
+            str(option.get("id") or ""),
+        )
+    )
     return options
 
 
