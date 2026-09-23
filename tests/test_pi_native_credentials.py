@@ -636,8 +636,10 @@ def test_named_sibling_provider_is_selectable_without_replacing_the_default() ->
     )
     by_id = {option["id"]: option for option in options}
     assert by_id["omnigent-synapse/gpt-6-sol"]["isDefault"] is False
-    assert by_id["omnigent-synapse/claude-opus-5"]["isDefault"] is False
+    assert by_id["omnigent-synapse/gpt-6-sol"]["displayName"] == "synapse/gpt-6-sol"
+    assert by_id["omnigent-synapse/claude-opus-5"]["displayName"] == "synapse/claude-opus-5"
     assert by_id["omnigent/flash:low"]["isDefault"] is True
+    assert by_id["omnigent/flash:low"]["displayName"] == "omlx/flash:low"
 
 
 def test_openai_chat_wire_api_resolves_to_completions(monkeypatch: pytest.MonkeyPatch) -> None:
