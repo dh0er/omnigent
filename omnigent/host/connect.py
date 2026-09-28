@@ -3142,6 +3142,24 @@ class HostProcess:
                 error="the codex model probe failed — see the host log",
             )
 
+        if harness in {"cursor-native", "native-cursor"}:
+            from omnigent.harnesses.cursor_native.main import list_cursor_model_catalog
+
+            try:
+                models = await asyncio.to_thread(list_cursor_model_catalog)
+            except Exception:  # noqa: BLE001 — no catalog, never a crash
+                _logger.warning("failed to resolve Cursor model options", exc_info=True)
+                return HostModelOptionsResultFrame(
+                    request_id=frame.request_id,
+                    status="failed",
+                    error="failed to resolve Cursor model options",
+                )
+            return HostModelOptionsResultFrame(
+                request_id=frame.request_id,
+                status="ok",
+                models=with_source(models),
+            )
+
         if harness == "pi-native":
             try:
                 from omnigent.harnesses.pi_native.credentials import pi_native_model_options

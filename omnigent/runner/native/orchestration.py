@@ -2912,6 +2912,13 @@ async def _auto_create_cursor_terminal(
     if not any(arg in ("--model", "-m") or arg.startswith("--model=") for arg in cursor_args):
         model = launch_config.model_override or _cursor_native_model_from_spec(agent_spec)
         if model is not None:
+            # Cursor encodes effort in the model id (``gpt-5.3-codex-high``).
+            # The session stores the base id plus ``reasoning_effort``; only
+            # the launch command combines them.
+            if launch_config.reasoning_effort:
+                from omnigent.harnesses.cursor_native.main import cursor_model_id_for_effort
+
+                model = cursor_model_id_for_effort(model, launch_config.reasoning_effort)
             cursor_args.extend(["--model", model])
     terminal_view = await resource_registry.launch_required_terminal(
         session_id=session_id,
