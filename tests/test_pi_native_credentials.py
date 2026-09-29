@@ -1252,6 +1252,58 @@ def test_pi_native_model_options_default_row_is_the_no_selection_launch(
     assert args[:4] == ["--provider", "omnigent-openai", "--model", "system.ai.gpt-5"]
 
 
+def test_named_sibling_provider_is_selectable_without_replacing_the_default() -> None:
+    """A second endpoint shows up in the Pi catalog and does not become the default."""
+    config = {
+        "providers": {
+            "omlx": {
+                "kind": "local",
+                "default": "pi",
+                "openai": {
+                    "base_url": "http://127.0.0.1:8001/v1",
+                    "api_key": "sk-test",
+                    "wire_api": "chat",
+                    "models": {"default": "flash:low", "medium": "flash:medium"},
+                },
+            },
+            "synapse": {
+                "kind": "key",
+                "anthropic": {
+                    "base_url": "https://llm.example.test",
+                    "api_key": "sk-synapse",
+                    "models": {"default": "gpt-6-sol", "opus": "claude-opus-5"},
+                },
+            },
+        }
+    }
+
+    def _handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404)
+
+    provider = creds.resolve_pi_native_provider(config_loader=lambda: config)
+    assert provider is not None
+    assert provider.model == "flash:low"
+    assert "omnigent-synapse" in provider.to_models_config()["providers"]
+
+    picked = creds.resolve_pi_native_provider(
+        model="omnigent-synapse/gpt-6-sol",
+        config_loader=lambda: config,
+    )
+    assert picked is not None
+    assert picked.model == "flash:low"
+
+    options = creds.pi_native_model_options(
+        config_loader=lambda: config,
+        transport=httpx.MockTransport(_handler),
+    )
+    by_id = {option["id"]: option for option in options}
+    assert by_id["omnigent-synapse/gpt-6-sol"]["isDefault"] is False
+    assert by_id["omnigent-synapse/gpt-6-sol"]["displayName"] == "synapse/gpt-6-sol"
+    assert by_id["omnigent-synapse/claude-opus-5"]["displayName"] == "synapse/claude-opus-5"
+    assert by_id["omnigent/flash:low"]["isDefault"] is True
+    assert by_id["omnigent/flash:low"]["displayName"] == "omlx/flash:low"
+
+
 def test_openai_chat_wire_api_resolves_to_completions(monkeypatch: pytest.MonkeyPatch) -> None:
     """An OpenAI family with wire_api: chat → openai-completions API.
 
