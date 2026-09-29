@@ -11020,6 +11020,14 @@ async def _fetch_model_options(
             return await _load_acp_model_options(session_id, conv, agent_store)
         return []
     cached = _model_options_cache.get(session_id)
+    if wrapper == _CURSOR_NATIVE_WRAPPER_LABEL_VALUE and cached:
+        cached = sorted(
+            cached,
+            key=lambda option: (
+                str(option.get("displayName") or option.get("id") or "").casefold(),
+                str(option.get("id") or ""),
+            ),
+        )
     if runner_client is None:
         # No runner to ask (asleep / stranded): serve the last-fetched
         # catalog so the picker stays usable for offline model changes.
