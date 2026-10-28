@@ -17,11 +17,13 @@ from omnigent.harnesses.cursor_native import bridge
 from omnigent.harnesses.cursor_native import forwarder as fwd
 from omnigent.harnesses.cursor_native import status as cursor_status
 from omnigent.runner import app as runner_app
+from omnigent.runner import subagent_work
 from omnigent.server.routes._sessions.orchestration import (
     _enrich_terminal_status_with_subagent_output,
 )
 from omnigent.spec.types import AgentSpec, ExecutorSpec
 from omnigent.stores.conversation_store import ConversationStore
+from tests.budgets import budget
 from tests.runner.conftest import (
     _drain_session_event_queue,
     _FakeProcessManager,
@@ -95,7 +97,7 @@ async def test_damaged_stop_marker_recovers_parent_delivery(
                 assert response.status_code == 204, response.text
                 results.extend(rig.drained())
                 if len(results) == 1:
-                    runner_app.register_subagent_work(
+                    subagent_work.register_subagent_work(
                         parent_session_id=rig.parent_id,
                         child_session_id=rig.child_id,
                         agent="researcher",
@@ -124,7 +126,7 @@ async def test_damaged_stop_marker_recovers_parent_delivery(
                     poll_interval_s=0.01,
                 )
             )
-            async with asyncio.timeout(2):
+            async with asyncio.timeout(budget(2)):
                 while cursor_status.read_posted_count(tmp_path) != 2:
                     await asyncio.sleep(0.01)
             assert [(r["status"], r["output"]) for r in results] == [
@@ -177,14 +179,14 @@ async def test_cursor_interrupt_delivers_actual_stop_outcome(
     )
     inbox: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
     if parent_ready:
-        runner_app._session_inboxes_ref[parent_id] = inbox
-    runner_app.register_subagent_work(
+        subagent_work._session_inboxes_ref[parent_id] = inbox
+    subagent_work.register_subagent_work(
         parent_session_id=parent_id,
         child_session_id=child_id,
         agent="cursor-native",
         title="research",
     )
-    runner_app.register_child_session(
+    subagent_work.register_child_session(
         child_id, parent_session_id=parent_id, title="research", tool="cursor", session_name="r"
     )
     try:
@@ -218,7 +220,7 @@ async def test_cursor_interrupt_delivers_actual_stop_outcome(
                 bare_idle = {"type": "external_session_status", "data": {"status": "idle"}}
                 retry = await client.post(endpoint, json=bare_idle)
                 assert retry.status_code == 503, retry.text
-                runner_app._session_inboxes_ref[parent_id] = inbox
+                subagent_work._session_inboxes_ref[parent_id] = inbox
                 retry = await client.post(endpoint, json=bare_idle)
                 assert retry.status_code == 204, retry.text
             result = inbox.get_nowait()
@@ -231,9 +233,9 @@ async def test_cursor_interrupt_delivers_actual_stop_outcome(
             child_updates = [e for e in events if e.get("type") == "session.child_session.updated"]
             assert child_updates[-1]["child"]["current_task_status"] == outcome
     finally:
-        runner_app.unregister_subagent_work_for_session(parent_id)
-        runner_app.unregister_child_session(child_id)
-        runner_app._session_inboxes_ref.pop(parent_id, None)
+        subagent_work.unregister_subagent_work_for_session(parent_id)
+        subagent_work.unregister_child_session(child_id)
+        subagent_work._session_inboxes_ref.pop(parent_id, None)
         runner_app._session_event_queues_ref.pop(parent_id, None)
         runner_app._session_event_queues_ref.pop(child_id, None)
 
@@ -248,7 +250,7 @@ async def test_idle_retry_preserves_only_confirmed_cancellation_without_cached_s
         process_manager=_FakeProcessManager(_ScriptedHarnessClient([])),  # type: ignore[arg-type]
         server_client=NullServerClient(),  # type: ignore[arg-type]
     )
-    runner_app.register_subagent_work(
+    subagent_work.register_subagent_work(
         parent_session_id=parent_id, child_session_id=child_id, agent="worker", title="research"
     )
     try:
@@ -268,11 +270,11 @@ async def test_idle_retry_preserves_only_confirmed_cancellation_without_cached_s
                 )
                 assert terminal.status_code == 503, terminal.text
             else:
-                runner_app.mark_subagent_work_terminal(
+                subagent_work.mark_subagent_work_terminal(
                     child_id, status="cancelled", output="Interrupt requested"
                 )
             inbox: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
-            runner_app._session_inboxes_ref[parent_id] = inbox
+            subagent_work._session_inboxes_ref[parent_id] = inbox
             retried = await client.post(
                 endpoint,
                 json={
@@ -287,5 +289,5 @@ async def test_idle_retry_preserves_only_confirmed_cancellation_without_cached_s
             )
             assert (result["status"], result["output"]) == expected
     finally:
-        runner_app.unregister_subagent_work_for_session(parent_id)
-        runner_app._session_inboxes_ref.pop(parent_id, None)
+        subagent_work.unregister_subagent_work_for_session(parent_id)
+        subagent_work._session_inboxes_ref.pop(parent_id, None)
