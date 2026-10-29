@@ -21,20 +21,6 @@ run-name: "${{ github.event_name == 'workflow_dispatch' && format('Merge Ready #
 # (branch protection has enforce_admins=false).
 
 on:
-  # Label changes refresh automatic dependency eligibility; workflow_run
-  # re-evaluates on CI completion for all PRs
-  # (same-repo and fork -- ctx resolves the PR from the head SHA).
-  # pull_request_target (not pull_request) so this workflow always runs from
-  # main -- a PR cannot modify the gate logic by editing this file.
-  pull_request_target:
-    types: [labeled, unlabeled]
-  workflow_run:
-    workflows: [PR Template, CI, Lint, Docker build, E2E UI Tests, E2E Tests, Integration Tests, UI Snapshot, web Tests, Android Bundle, Security Scan, Trivy CVE Scan, Windows (native), Maintainer Approval]
-    types: [completed]
-  check_run:
-    types: [completed]
-  issue_comment:
-    types: [created]
   # Programmatic / manual re-evaluation of a single PR.
   workflow_dispatch:
     inputs:

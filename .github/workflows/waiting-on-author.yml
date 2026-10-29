@@ -10,12 +10,6 @@ name: Waiting on Author Hygiene
 # waiting-on-author-review.yml and waiting-on-author-review-run.yml.
 
 on:
-  pull_request_target:
-    types: [synchronize, labeled]
-  issue_comment:
-    types: [created]
-  schedule:
-    - cron: "0 */12 * * *"
   workflow_dispatch:
 
 permissions:

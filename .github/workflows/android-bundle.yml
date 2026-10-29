@@ -19,10 +19,6 @@ on:
         description: "Optional note appended to the artifact filename (e.g. rc1)"
         required: false
         default: ""
-  pull_request:
-    paths:
-      - ".github/workflows/android-bundle.yml"
-      - "web/android/**"
 
 permissions:
   contents: read

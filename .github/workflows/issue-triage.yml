@@ -30,8 +30,6 @@ name: Issue Triage
 #      default), after the owner above is assigned
 
 on:
-  issues:
-    types: [opened, edited]
   # Manual dry run against any issue: classify and log the decision. Both
   # inputs default off, and with them off nothing is written — no label,
   # comment, assignment, or closure.

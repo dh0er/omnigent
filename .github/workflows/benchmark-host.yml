@@ -13,14 +13,6 @@ name: Benchmark (host sessions)
 # runner against a zero-latency mock LLM — no agent CLI or credentials).
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "omnigent/host/**"
-      - "omnigent/runner/**"
-      - "omnigent/server/**"
-      - "dev/benchmarks/**"
-      - ".github/workflows/benchmark-host.yml"
   workflow_dispatch:
     inputs:
       journeys:
