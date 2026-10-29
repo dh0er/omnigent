@@ -26,9 +26,6 @@ name: Draft feature blogs
 # screenshot) and hero art / byline are added by a human before merge.
 
 on:
-  workflow_run:
-    workflows: ["GitHub Release"]
-    types: [completed]
   workflow_dispatch:
     inputs:
       tag:

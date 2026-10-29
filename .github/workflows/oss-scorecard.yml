@@ -8,12 +8,7 @@ name: OSS Scorecard
 # flip it to true, add `id-token: write` to the job, and add the README badge.
 
 on:
-  # Re-score on branch-protection changes, weekly, and on push to main.
-  branch_protection_rule:
-  schedule:
-    - cron: '37 4 * * 1'  # Mondays 04:37 UTC
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 permissions: read-all
 

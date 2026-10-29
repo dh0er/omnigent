@@ -14,9 +14,7 @@ name: UI Snapshot Failure Comment
 # branch, so it activates once merged to main -- it does not fire on its own PR.
 
 on:
-  workflow_run:
-    workflows: ["UI Snapshot"]
-    types: [completed]
+  workflow_dispatch:
 
 permissions:
   contents: read

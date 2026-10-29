@@ -25,17 +25,6 @@
 name: Publish images (public)
 
 on:
-  # Release builds only — every v* tag push publishes the immutable version pin
-  # and moves the floating release tags. Per-commit main builds were retired in
-  # favour of the nightly rebuild below; PRs get a build-only check (docker-build.yml)
-  # so a broken image is caught before merge without a push.
-  push:
-    tags: ['v*']
-  # Nightly rebuild of main HEAD (07:00 UTC): the build-and-push job publishes
-  # :sha-<short> + :latest-nightly. This is what keeps bleeding-edge ~1 day
-  # fresh now that main commits no longer each trigger a build.
-  schedule:
-    - cron: '0 7 * * *'
   workflow_dispatch:
     inputs:
       bump_latest:

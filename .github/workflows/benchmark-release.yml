@@ -10,6 +10,16 @@ name: Benchmark (release)
 # runs on PRs that edit this file so a change is exercised before a release.
 
 on:
+  workflow_dispatch:
+    inputs:
+      candidate_ref:
+        description: "Ref to benchmark as the candidate (blank = dispatch ref HEAD)."
+        required: false
+        default: ""
+      baseline_ref:
+        description: "Ref to compare against (blank = latest stable release)."
+        required: false
+        default: ""
   workflow_call:
     inputs:
       candidate_ref:
@@ -36,20 +46,6 @@ on:
       unmeasured:
         description: "Comma-separated required journeys that were not measured."
         value: ${{ jobs.benchmark.outputs.unmeasured }}
-  workflow_dispatch:
-    inputs:
-      candidate_ref:
-        description: "Ref to benchmark as the candidate (blank = dispatch ref HEAD)."
-        required: false
-        default: ""
-      baseline_ref:
-        description: "Ref to compare against (blank = latest stable release)."
-        required: false
-        default: ""
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - ".github/workflows/benchmark-release.yml"
 
 permissions:
   contents: read

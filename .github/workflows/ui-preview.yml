@@ -58,20 +58,6 @@ on:
         description: 'App creator observed by the cleanup reconciler'
         required: true
         type: string
-  push:
-    branches:
-      - main
-    paths:
-      - web/**
-      - .github/workflows/ui-preview.yml
-      - .github/ui-preview/**
-  pull_request_target:
-    types:
-      - opened
-      - synchronize
-      - reopened
-      - labeled
-      - closed
 
 concurrency:
   group: >-

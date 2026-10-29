@@ -25,9 +25,6 @@
 name: Doc sync
 
 on:
-  # Every merge to main, incl. fork PRs (see top-of-file for why not pull_request_target).
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       pr:

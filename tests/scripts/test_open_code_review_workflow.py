@@ -212,10 +212,9 @@ class OpenCodeReviewWorkflowTest(unittest.TestCase):
         # PyYAML's YAML 1.1 loader reads the workflow's `on` key as True.
         triggers = WORKFLOW[True]
         polly = yaml.safe_load((ROOT / ".github/workflows/polly-review.yml").read_text())
-        self.assertEqual(triggers["pull_request_target"], polly[True]["pull_request_target"])
-        self.assertNotIn("pull_request", triggers)
-        self.assertNotIn("synchronize", triggers["pull_request_target"]["types"])
-        for action in triggers["pull_request_target"]["types"]:
+        self.assertEqual(set(triggers), {"workflow_dispatch"})
+        self.assertEqual(set(polly[True]), {"workflow_dispatch"})
+        for action in ("opened", "reopened", "ready_for_review"):
             for fork in (False, True):
                 with self.subTest(action=action, fork=fork):
                     context = self.pull_request(action=action, fork=fork)

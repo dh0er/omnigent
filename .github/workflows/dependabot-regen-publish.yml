@@ -21,9 +21,7 @@
 name: Dependabot lockfile regen publish
 
 on:
-  workflow_run:
-    workflows: ["Dependabot lockfile regen"]
-    types: [completed]
+  workflow_dispatch:
 
 permissions:
   contents: read

@@ -20,9 +20,7 @@ name: Polly Review Approval Dispatch
 # and dispatches a workflow, so it is not a "dangerous" workflow_run consumer.
 
 on:
-  workflow_run:
-    workflows: [Polly Review On Approval]
-    types: [completed]
+  workflow_dispatch:
 
 permissions:
   contents: read

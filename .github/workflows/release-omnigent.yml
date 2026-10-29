@@ -35,11 +35,6 @@ on:
         options:
           - test-pypi
           - pypi
-  # CI-test the workflow on change: build + gates run on the PR; publish
-  # steps are condition-gated off PR events.
-  pull_request:
-    paths:
-      - ".github/workflows/release-omnigent.yml"
 
 permissions:
   contents: read

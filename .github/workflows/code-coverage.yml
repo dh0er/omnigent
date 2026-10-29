@@ -19,9 +19,7 @@ name: Code Coverage
 # merge, also mark the status a required check in branch protection.
 
 on:
-  workflow_run:
-    workflows: [CI, web Tests]
-    types: [completed]
+  workflow_dispatch:
 
 # Read-only at the top level; write scopes live on the job below.
 permissions:

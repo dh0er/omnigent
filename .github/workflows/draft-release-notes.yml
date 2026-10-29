@@ -23,9 +23,6 @@ name: Draft release notes
 # only ever sees already-merged, released history.
 
 on:
-  workflow_run:
-    workflows: ["GitHub Release"]
-    types: [completed]
   workflow_dispatch:
     inputs:
       tag:

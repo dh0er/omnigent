@@ -8,9 +8,7 @@ name: Maintainer Approval Rerun Run
 # approval to turn the check green.
 
 on:
-  workflow_run:
-    workflows: [Maintainer Approval Rerun]
-    types: [completed]
+  workflow_dispatch:
 
 permissions:
   contents: read

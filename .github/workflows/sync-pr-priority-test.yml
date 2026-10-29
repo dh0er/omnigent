@@ -4,16 +4,6 @@ name: Sync PR Priority Test
 # it. Runs on PR head without secrets, only when those files change.
 
 on:
-  pull_request:
-    paths:
-      - .github/scripts/sync_pr_priority.py
-      - .github/scripts/sync_pr_priority_test.py
-      - .github/triage_v2/tests/test_bundle_configuration.py
-      - .github/workflows/issue-prioritization-v2.yml
-      - .github/workflows/issue-triage.yml
-      - .github/workflows/needs-info-response.yml
-      - .github/workflows/sync-pr-priority.yml
-      - .github/workflows/sync-pr-priority-test.yml
   workflow_dispatch:
 
 permissions:

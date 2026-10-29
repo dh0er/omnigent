@@ -24,8 +24,6 @@ name: Publish Changelog
 # publish.
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag:
