@@ -57,37 +57,20 @@ label yourself; a human maintainer adds it after checking the mirror.
 
 ## Committing
 
-New text and filenames must follow the reference policy in
-`dev/lint/lint_reference_policy.py`. Use generic names and reserved example
-domains, including in tests and fixtures; do not add deployment-specific
-identifiers or access instructions. The local `reference-policy` hook checks
-staged changes and pushed commits; CI checks the branch diff. Push checks require
-a complete revision range and fail if it is unavailable. Do not add suppressions
-or expand exemptions to make a change pass.
-
-The `pre-commit` hooks are the local gate, and CI runs the same checks. They
-run on `git commit` and again on `git push` only after they are installed:
-`just ensure` does that (or `just hooks` on its own), once per clone. Worktrees
-share the clone's `.git`, so one install covers them all.
-
-- Never pass `--no-verify`. A hook failure is a finding to fix, not a gate to
-  skip; the push hook will fail on the same commits anyway.
-- Files written through shell heredocs or scripts are unformatted until a hook
-  or `just lint` touches them. Let the required formatting hooks validate them;
-  a duplicate standalone Prettier run is not required before pushing. If a
-  manual check is needed, read its exit code rather than grepping hook output.
-- To check by hand, `just lint` runs the hooks over staged files and
-  `just lint-all` over the whole tree. Fix what they report, re-stage, commit.
+This fork runs no git hooks: commits and pushes are not checked locally, and
+`just ensure` removes any installed `pre-commit`/`pre-push` hooks. Commit and
+push directly. `just lint` (staged files) and `just lint-all` (whole tree) stay
+available for manual checks.
 
 ## Local development shortcuts
 
 Use `just` for common tasks; run `just --list` for grouped recipes.
 
-- `just ensure` — install/check prerequisites, including the git hooks
+- `just ensure` — install/check prerequisites (and remove any git hooks)
 - `just run-ios` / `just run-android` — build/run mobile apps
 - `just dev` / `just dev-mobile` — start the omnigent dev pod
 - `just electron-dev` / `just electron-build` — Electron desktop shell
-- `just lint` / `just lint-all` — run pre-commit; `just hooks` — install the git hooks
+- `just lint` / `just lint-all` — run pre-commit checks manually
 - `just normalize-locks` — rewrite lockfile registries to PyPI/npmjs.org
 
 ### Local development database
